@@ -30,7 +30,7 @@ for (const name of await readdir(root))
     await copyFile(path.join(root, name), path.join(out, name));
 const index = await get('/sitemap.xml');
 await writeFile(path.join(out, 'sitemap.xml'), index, 'utf8');
-const pages = new Set(['/']);
+const pages = new Set(['/','/about','/rules','/privacy']);
 for (const pathname of locations(index)) {
   if (!/^\/sitemaps\/(?:pages|posts-\d+)\.xml$/.test(pathname)) throw Error('Unexpected child sitemap');
   const xml = await get(pathname);

@@ -48,6 +48,9 @@ for (const page of catalog.pages) {
     typeof page.description !== 'string' ||
     page.description.length > 4096 ||
     typeof page.image !== 'string' ||
+    typeof page.text !== 'string' ||
+    page.text.length > 4096 ||
+    (page.links !== undefined && (!Array.isArray(page.links) || page.links.length > 50)) ||
     (page.image &&
       !/^https:\/\/cf-stenka\.furry\.by\/media\/[a-zA-Z0-9-]+\/(?:main|thumb)$/.test(page.image)) ||
     metadataByPath.has(page.path)
@@ -57,6 +60,24 @@ for (const page of catalog.pages) {
   metadataByPath.set(page.path, {
     title: '<title>' + escape(page.title) + '</title>',
     tags: `<meta name="description" content="${escape(page.description)}"><meta property="og:type" content="${page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(page.canonical)}">${page.image ? `<meta property="og:image" content="${escape(page.image)}">` : ''}<meta name="twitter:card" content="summary_large_image">`,
+    heading: escape(page.title),
+    content: `<section id="public-content" aria-label="Содержание страницы"><p>${escape(page.text || page.description)}</p>${(
+      page.links || []
+    )
+      .map((link) => {
+        if (
+          !/^\/wall\d{1,16}$/.test(link.path) ||
+          typeof link.title !== 'string' ||
+          link.title.length > 4096 ||
+          typeof link.description !== 'string' ||
+          link.description.length > 4096
+        )
+          throw Error('Invalid public link');
+        return `<article><h2><a href="${escape(link.path)}">${escape(link.title)}</a></h2><p>${escape(link.description)}</p></article>`;
+      })
+      .join(
+        '',
+      )}<nav aria-label="О сайте"><a href="/">Главная</a> · <a href="/about">О проекте</a> · <a href="/rules">Правила</a> · <a href="/privacy">Приватность</a></nav></section>`,
   });
 }
 await mkdir(out, { recursive: true });
@@ -94,11 +115,14 @@ for (const pathname of pages) {
     'href="https://stenka.furry.by/"',
     'href="https://stenka.furry.by' + pathname + '"',
   );
-  // Only public metadata is retained; source documents, CSRF and post bodies are never written.
+  // Escape approved plain text; never export source documents, CSRF or private content.
   if (metadata.title) page = page.replace(/<title>[^<]*<\/title>/, () => metadata.title);
   page = page
     .replace(/<meta name="description"[^>]*>/, '')
     .replace('</head>', () => metadata.tags + '</head>');
+  page = page
+    .replace('<h1>Фурри Стенка</h1>', () => '<h1>' + metadata.heading + '</h1>')
+    .replace('</main>', () => '</main>' + metadata.content);
   await writeFile(path.join(directory, 'index.html'), page, 'utf8');
 }
 await writeFile(
@@ -115,7 +139,7 @@ await writeFile(
   'utf8',
 );
 console.log(
-  'Public entry routes and sitemap refreshed: ' +
+  'Public entry routes, approved content and sitemap refreshed: ' +
     pages.size +
-    ' pages. No sessions or post bodies exported.',
+    ' pages. No sessions or private content exported.',
 );

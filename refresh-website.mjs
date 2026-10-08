@@ -34,6 +34,9 @@ const escape = (value) =>
     .replaceAll('<', '&lt;')
     .replaceAll('>', '&gt;')
     .replaceAll('"', '&quot;');
+const pagePath = (pathname) => pathname.replace(/\/+$/, '') || '/';
+const publicUrl = (pathname) =>
+  'https://stenka.furry.by' + (pathname === '/' ? '/' : pagePath(pathname) + '/');
 const catalog = JSON.parse(await get('/site-metadata?batch=1'));
 if (!Array.isArray(catalog.pages) || catalog.pages.length > 500)
   throw Error('Invalid public metadata catalog');
@@ -41,7 +44,7 @@ const metadataByPath = new Map();
 for (const page of catalog.pages) {
   if (
     !/^\/(?:$|about$|rules$|privacy$|wall\d{1,16}$|u\/[a-zA-Z0-9_]{3,30}$)/.test(page.path) ||
-    page.canonical !== 'https://stenka.furry.by' + page.path ||
+    !['https://stenka.furry.by' + page.path, publicUrl(page.path)].includes(page.canonical) ||
     !['article', 'website'].includes(page.type) ||
     typeof page.title !== 'string' ||
     page.title.length > 4096 ||
@@ -59,7 +62,7 @@ for (const page of catalog.pages) {
   // Generate only the whitelist. Never retain raw source HTML or arbitrary attributes.
   metadataByPath.set(page.path, {
     title: '<title>' + escape(page.title) + '</title>',
-    tags: `<meta name="description" content="${escape(page.description)}"><meta property="og:type" content="${page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(page.canonical)}">${page.image ? `<meta property="og:image" content="${escape(page.image)}">` : ''}<meta name="twitter:card" content="summary_large_image">`,
+    tags: `<meta name="description" content="${escape(page.description)}"><meta property="og:type" content="${page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(publicUrl(page.path))}">${page.image ? `<meta property="og:image" content="${escape(page.image)}">` : ''}<meta name="twitter:card" content="summary_large_image">`,
     content: `<section id="public-content" aria-label="Содержание страницы"><h1>${escape(page.title)}</h1><p>${escape(page.text || page.description)}</p>${(
       page.links || []
     )
@@ -72,11 +75,11 @@ for (const page of catalog.pages) {
           link.description.length > 4096
         )
           throw Error('Invalid public link');
-        return `<article><h2><a href="${escape(link.path)}">${escape(link.title)}</a></h2><p>${escape(link.description)}</p></article>`;
+        return `<article><h2><a href="${escape(link.path + '/')}">${escape(link.title)}</a></h2><p>${escape(link.description)}</p></article>`;
       })
       .join(
         '',
-      )}<!--noindex--><div data-nosnippet><nav aria-label="О сайте"><a href="/">Главная</a> · <a href="/about">О проекте</a> · <a href="/rules">Правила</a> · <a href="/privacy">Приватность</a></nav></div><!--/noindex--></section>`,
+      )}<!--noindex--><div data-nosnippet><nav aria-label="О сайте"><a href="/">Главная</a> · <a href="/about/">О проекте</a> · <a href="/rules/">Правила</a> · <a href="/privacy/">Приватность</a></nav></div><!--/noindex--></section>`,
   });
 }
 await mkdir(out, { recursive: true });
@@ -93,10 +96,13 @@ const pages = new Set(['/', '/about', '/rules', '/privacy']);
 for (const pathname of locations(index)) {
   if (!/^\/sitemaps\/(?:pages|posts-\d+)\.xml$/.test(pathname))
     throw Error('Unexpected child sitemap');
-  const xml = await get(pathname);
+  const xml = (await get(pathname)).replace(/<loc>([^<]+)<\/loc>/g, (_match, value) => {
+    const [location] = locations('<loc>' + value + '</loc>');
+    return '<loc>' + publicUrl(location) + '</loc>';
+  });
   await mkdir(path.dirname(path.join(out, pathname)), { recursive: true });
   await writeFile(path.join(out, pathname), xml, 'utf8');
-  for (const location of locations(xml)) pages.add(location);
+  for (const location of locations(xml)) pages.add(pagePath(location));
 }
 if (pages.size > 500) throw Error('Public metadata refresh exceeds the free-tier request ceiling');
 for (const pathname of pages) {
@@ -112,7 +118,7 @@ for (const pathname of pages) {
   await mkdir(directory, { recursive: true });
   let page = template.replace(
     'href="https://stenka.furry.by/"',
-    'href="https://stenka.furry.by' + pathname + '"',
+    'href="' + publicUrl(pathname) + '"',
   );
   // Escape approved plain text; never export source documents, CSRF or private content.
   if (metadata.title) page = page.replace(/<title>[^<]*<\/title>/, () => metadata.title);

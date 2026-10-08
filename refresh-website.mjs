@@ -131,6 +131,26 @@ await writeFile(
   ),
   'utf8',
 );
+// These application routes are intentionally absent from the public sitemap,
+// but a direct visit or reload must still receive a real 200 launcher page.
+for (const pathname of [
+  '/search',
+  '/login',
+  '/settings',
+  '/my',
+  '/saved',
+  '/notifications',
+  '/new',
+  '/admin',
+  '/app',
+]) {
+  const directory = path.join(out, pathname);
+  await mkdir(directory, { recursive: true });
+  const page = template
+    .replace('href="https://stenka.furry.by/"', 'href="https://stenka.furry.by' + pathname + '"')
+    .replace('</head>', '<meta name="robots" content="noindex"></head>');
+  await writeFile(path.join(directory, 'index.html'), page, 'utf8');
+}
 await writeFile(
   path.join(out, 'robots.txt'),
   'User-agent: *\nAllow: /\nSitemap: https://stenka.furry.by/sitemap.xml\n',

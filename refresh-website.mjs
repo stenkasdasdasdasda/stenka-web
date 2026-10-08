@@ -60,8 +60,7 @@ for (const page of catalog.pages) {
   metadataByPath.set(page.path, {
     title: '<title>' + escape(page.title) + '</title>',
     tags: `<meta name="description" content="${escape(page.description)}"><meta property="og:type" content="${page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(page.canonical)}">${page.image ? `<meta property="og:image" content="${escape(page.image)}">` : ''}<meta name="twitter:card" content="summary_large_image">`,
-    heading: escape(page.title),
-    content: `<section id="public-content" aria-label="Содержание страницы"><p>${escape(page.text || page.description)}</p>${(
+    content: `<section id="public-content" aria-label="Содержание страницы"><h1>${escape(page.title)}</h1><p>${escape(page.text || page.description)}</p>${(
       page.links || []
     )
       .map((link) => {
@@ -77,7 +76,7 @@ for (const page of catalog.pages) {
       })
       .join(
         '',
-      )}<nav aria-label="О сайте"><a href="/">Главная</a> · <a href="/about">О проекте</a> · <a href="/rules">Правила</a> · <a href="/privacy">Приватность</a></nav></section>`,
+      )}<!--noindex--><div data-nosnippet><nav aria-label="О сайте"><a href="/">Главная</a> · <a href="/about">О проекте</a> · <a href="/rules">Правила</a> · <a href="/privacy">Приватность</a></nav></div><!--/noindex--></section>`,
   });
 }
 await mkdir(out, { recursive: true });
@@ -120,9 +119,8 @@ for (const pathname of pages) {
   page = page
     .replace(/<meta name="description"[^>]*>/, '')
     .replace('</head>', () => metadata.tags + '</head>');
-  page = page
-    .replace('<h1>Фурри Стенка</h1>', () => '<h1>' + metadata.heading + '</h1>')
-    .replace('</main>', () => '</main>' + metadata.content);
+  // Public content must be outside the loading UI's noindex / data-nosnippet boundary.
+  page = page.replace('</body>', () => metadata.content + '</body>');
   await writeFile(path.join(directory, 'index.html'), page, 'utf8');
 }
 await writeFile(

@@ -157,9 +157,23 @@ for (const pathname of [
     .replace('</head>', '<meta name="robots" content="noindex"></head>');
   await writeFile(path.join(directory, 'index.html'), page, 'utf8');
 }
+// Build the HTTP map from the same approved pages without changing HTTPS canonicals.
+const httpPages = [...pages].filter((pathname) => metadataByPath.has(pathname));
+await writeFile(
+  path.join(out, 'sitemap-http.xml'),
+  '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' +
+    httpPages
+      .map(
+        (pathname) =>
+          '<url><loc>' + publicUrl(pathname).replace('https:', 'http:') + '</loc></url>',
+      )
+      .join('') +
+    '</urlset>\n',
+  'utf8',
+);
 await writeFile(
   path.join(out, 'robots.txt'),
-  'User-agent: *\nAllow: /\nSitemap: https://stenka.furry.by/sitemap.xml\n',
+  'User-agent: *\nAllow: /\nSitemap: https://stenka.furry.by/sitemap.xml\nSitemap: http://stenka.furry.by/sitemap-http.xml\n',
   'utf8',
 );
 console.log(

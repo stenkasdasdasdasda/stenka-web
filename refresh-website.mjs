@@ -43,7 +43,9 @@ if (!Array.isArray(catalog.pages) || catalog.pages.length > 500)
 const metadataByPath = new Map();
 for (const page of catalog.pages) {
   if (
-    !/^\/(?:$|about$|rules$|privacy$|wall\d{1,16}$|u\/[a-zA-Z0-9_]{3,30}$)/.test(page.path) ||
+    !/^\/(?:$|about$|rules$|privacy$|wall\d{1,16}$|(?:u|photo)\/[a-zA-Z0-9_]{3,30}$)/.test(
+      page.path,
+    ) ||
     !['https://stenka.furry.by' + page.path, publicUrl(page.path)].includes(page.canonical) ||
     !['article', 'website'].includes(page.type) ||
     typeof page.title !== 'string' ||
@@ -52,6 +54,7 @@ for (const page of catalog.pages) {
     page.description.length > 4096 ||
     typeof page.image !== 'string' ||
     typeof page.text !== 'string' ||
+    (page.noindex !== undefined && typeof page.noindex !== 'boolean') ||
     page.text.length > 4096 ||
     (page.links !== undefined && (!Array.isArray(page.links) || page.links.length > 50)) ||
     (page.image &&
@@ -62,7 +65,7 @@ for (const page of catalog.pages) {
   // Generate only the whitelist. Never retain raw source HTML or arbitrary attributes.
   metadataByPath.set(page.path, {
     title: '<title>' + escape(page.title) + '</title>',
-    tags: `<meta name="description" content="${escape(page.description)}"><meta property="og:type" content="${page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(publicUrl(page.path))}">${page.image ? `<meta property="og:image" content="${escape(page.image)}">` : ''}<meta name="twitter:card" content="summary_large_image">`,
+    tags: `${page.noindex ? '<meta name="robots" content="noindex,follow">' : ''}<meta name="description" content="${escape(page.description)}"><meta property="og:type" content="${page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(publicUrl(page.path))}">${page.image ? `<meta property="og:image" content="${escape(page.image)}">` : ''}<meta name="twitter:card" content="summary_large_image">`,
     content: `<section id="public-content" aria-label="Содержание страницы"><h1>${escape(page.title)}</h1><p>${escape(page.text || page.description)}</p>${(
       page.links || []
     )
@@ -93,6 +96,7 @@ for (const name of await readdir(root))
 const index = await get('/sitemap.xml');
 await writeFile(path.join(out, 'sitemap.xml'), index, 'utf8');
 const pages = new Set(['/', '/about', '/rules', '/privacy']);
+for (const entry of catalog.pages) if (entry.path.startsWith('/photo/')) pages.add(entry.path);
 for (const pathname of locations(index)) {
   if (!/^\/sitemaps\/(?:pages|posts-\d+)\.xml$/.test(pathname))
     throw Error('Unexpected child sitemap');
@@ -107,7 +111,7 @@ for (const pathname of locations(index)) {
 if (pages.size > 500) throw Error('Public metadata refresh exceeds the free-tier request ceiling');
 for (const pathname of pages) {
   if (
-    !/^\/(?:$|about$|rules$|privacy$|search$|wall\d+$|u\/[a-zA-Z0-9_.-]+$|p\/[a-zA-Z0-9-]+(?:\/[a-zA-Z0-9_.-]+)?$|t\/[a-zA-Z0-9_.-]+$)/.test(
+    !/^\/(?:$|about$|rules$|privacy$|search$|wall\d+$|(?:u|photo)\/[a-zA-Z0-9_.-]+$|p\/[a-zA-Z0-9-]+(?:\/[a-zA-Z0-9_.-]+)?$|t\/[a-zA-Z0-9_.-]+$)/.test(
       pathname,
     )
   )

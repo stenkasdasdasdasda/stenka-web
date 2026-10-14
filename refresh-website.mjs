@@ -88,7 +88,7 @@ for (const page of catalog.pages) {
 await mkdir(out, { recursive: true });
 for (const name of await readdir(root))
   if (
-    /^(?:launch-[a-f0-9]{16}\.js|favicon\.(?:svg|png|ico)|apple-touch-icon\.png|CNAME|\.nojekyll)$/.test(
+    /^(?:launch-[a-f0-9]{16}\.js|favicon-dfl\.svg|favicon\.(?:svg|png|ico)|apple-touch-icon\.png|CNAME|\.nojekyll)$/.test(
       name,
     )
   )

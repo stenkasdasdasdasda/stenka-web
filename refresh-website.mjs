@@ -88,7 +88,7 @@ for (const page of catalog.pages) {
 await mkdir(out, { recursive: true });
 for (const name of await readdir(root))
   if (
-    /^(?:launch-[a-f0-9]{16}\.js|favicon-dfl\.svg|favicon\.(?:svg|png|ico)|apple-touch-icon\.png|CNAME|\.nojekyll)$/.test(
+    /^(?:launch-[a-f0-9]{16}\.js|favicon(?:-dfl|-pxl)\.svg|favicon(?:-pxl)?\.(?:svg|png|ico)|apple-touch-icon(?:-pxl)?\.png|CNAME|\.nojekyll)$/.test(
       name,
     )
   )
@@ -145,6 +145,7 @@ await writeFile(
 // but a direct visit or reload must still receive a real 200 launcher page.
 for (const pathname of [
   '/search',
+  '/communities',
   '/login',
   '/settings',
   '/my',

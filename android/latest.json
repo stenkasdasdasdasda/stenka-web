@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "packageName": "by.furry.stenka",
-  "versionCode": 3,
-  "versionName": "1.1.0",
+  "versionCode": 4,
+  "versionName": "1.2.0",
   "minSdk": 26,
-  "url": "https://stenka.furry.by/android/releases/stenka-1.1.0-3.apk",
-  "sha256": "0bd8301f6fe2605750e0ba969e3c4fea6fbe270bec9485a508d510a1c751aeb2",
-  "sizeBytes": 1363181,
-  "notes": "Обновлены нативные экраны и настройки. Плавные переходы, живые персонажи, отклик кнопок и переключателей. Светлые темы и одинаковые кнопки входа. WebView отсутствует."
+  "url": "https://stenka.furry.by/android/releases/stenka-1.2.0-4.apk",
+  "sha256": "2490be78eddf01f9e00ffd5cf5ee0da86f27189741322ab3ee54e70f3c131d73",
+  "sizeBytes": 6838827,
+  "notes": "Обновлены лента, поиск, профиль и настройки по мобильному сайту. Улучшены комментарии, редактор, эмодзи, кадрирование фотографий и анимации. Оформление и шрифты находятся внутри APK. WebView отсутствует."
 }

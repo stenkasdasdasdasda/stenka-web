@@ -1,5 +1,5 @@
 // Runs in the public Pages repository. Fetches only anonymous public sitemap URLs.
-import { mkdir, readFile, writeFile, copyFile, readdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, copyFile, readdir, lstat } from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 const root = process.env.STENKA_WEB_BUILD_ROOT || '.';
@@ -186,6 +186,31 @@ for (const name of await readdir(root))
     )
   )
     await copyFile(path.join(root, name), path.join(out, name));
+// Keep APK delivery independent of the runtime and of scheduled sitemap refreshes.
+const androidRoot = path.join(root, 'android');
+try {
+  const directory = await lstat(androidRoot);
+  if (!directory.isDirectory() || directory.isSymbolicLink()) throw Error('Invalid Android public directory');
+  const metadata = JSON.parse(await readFile(path.join(androidRoot, 'latest.json'), 'utf8'));
+  const filename = `stenka-${metadata.versionName}-${metadata.versionCode}.apk`;
+  if (metadata.packageName !== 'by.furry.stenka' || metadata.schema !== 1 || metadata.minSdk !== 26 ||
+      !/^stenka-[0-9]+\.[0-9]+\.[0-9]+-[1-9][0-9]*\.apk$/.test(filename) ||
+      metadata.url !== 'https://stenka.furry.by/android/releases/' + filename) throw Error('Invalid Android release metadata');
+  const bytes = await readFile(path.join(androidRoot, 'releases', filename));
+  if (bytes.length !== metadata.sizeBytes || bytes.length > 50 * 1024 * 1024 || createHash('sha256').update(bytes).digest('hex') !== metadata.sha256) throw Error('Android APK integrity mismatch');
+  await mkdir(path.join(out, 'android/releases'), { recursive: true });
+  for (const file of await readdir(androidRoot)) {
+    if (file === 'releases') continue;
+    if (!['index.html', 'latest.json', 'manifest.webmanifest', 'icon-192.png', 'icon-512.png'].includes(file) || !(await lstat(path.join(androidRoot, file))).isFile()) throw Error('Unexpected Android public file');
+    await copyFile(path.join(androidRoot, file), path.join(out, 'android', file));
+  }
+  for (const file of await readdir(path.join(androidRoot, 'releases'))) {
+    if (!/^stenka-[0-9]+\.[0-9]+\.[0-9]+-[1-9][0-9]*\.apk$/.test(file) || !(await lstat(path.join(androidRoot, 'releases', file))).isFile()) throw Error('Unexpected Android APK file');
+    await copyFile(path.join(androidRoot, 'releases', file), path.join(out, 'android/releases', file));
+  }
+  await mkdir(path.join(out, '.well-known'), { recursive: true });
+  await copyFile(path.join(root, '.well-known/assetlinks.json'), path.join(out, '.well-known/assetlinks.json'));
+} catch (error) { if (error.code !== 'ENOENT' || (await readdir(root)).includes('android')) throw error; }
 const index = await get('/sitemap.xml');
 await writeFile(path.join(out, 'sitemap.xml'), index, 'utf8');
 const pages = new Set(['/', '/about', '/rules', '/privacy']);

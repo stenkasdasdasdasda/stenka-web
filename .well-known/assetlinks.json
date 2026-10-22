@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "by.furry.stenka",
+      "sha256_cert_fingerprints": [
+        "BC:6A:26:7D:C1:FB:2D:78:DD:3F:2B:23:24:E7:A3:DF:28:87:BB:FE:80:0C:50:94:04:1D:22:35:35:FC:DE:FD"
+      ]
+    }
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "packageName": "by.furry.stenka",
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "minSdk": 26,
+  "url": "https://stenka.furry.by/android/releases/stenka-1.0.0-1.apk",
+  "sha256": "073b50704d10d6e734050d267c8b4bbf0e1082a03ec45fc53e536528c56864d8",
+  "sizeBytes": 1319533,
+  "notes": "Нативная Стенка для Android: лента, поиск, профили, комментарии и оформление внутри APK. Сохранение просмотренных страниц и проверка подписанных обновлений."
+}

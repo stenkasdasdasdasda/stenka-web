@@ -1,11 +1,11 @@
 {
   "schema": 1,
   "packageName": "by.furry.stenka",
-  "versionCode": 6,
-  "versionName": "1.2.2",
+  "versionCode": 7,
+  "versionName": "1.2.3",
   "minSdk": 26,
-  "url": "https://stenka.furry.by/android/releases/stenka-1.2.2-6.apk",
-  "sha256": "055d85596e7b397a221db9b2904cf5a56bfe85920808e2e2c81d795313a8b46a",
-  "sizeBytes": 6873427,
-  "notes": "Исправлены кэш страниц и изображений, подписи кнопок и рывки при переходах. Сообщества приближены к мобильному сайту. Добавлены выбор шрифта и обязательная проверка обновлений при открытии приложения."
+  "url": "https://stenka.furry.by/android/releases/stenka-1.2.3-7.apk",
+  "sha256": "8df0f3563e8b23f2e63aa14e26db88b3cc919f3237b209fc03e9e64c075ea7ce",
+  "sizeBytes": 6874295,
+  "notes": "Исправлено жирное начертание системного шрифта: обычный текст, подписи и заголовки имеют разную толщину."
 }

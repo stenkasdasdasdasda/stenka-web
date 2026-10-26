@@ -216,6 +216,17 @@ await writeFile(path.join(out, 'sitemap.xml'), index, 'utf8');
 const pages = new Set(['/', '/about', '/rules', '/privacy']);
 for (const entry of catalog.pages) if (entry.path.startsWith('/photo/')) pages.add(entry.path);
 for (const pathname of locations(index)) {
+  if (/^\/sitemaps\/maps-(?:pages|profiles-[1-9][0-9]*)\.xml$/.test(pathname)) {
+    const xml = await get(pathname);
+    if (xml.length > 2_000_000 || /<!DOCTYPE|<!ENTITY/i.test(xml) || !/<urlset(?:\s|>)/.test(xml) || !xml.trimEnd().endsWith('</urlset>')) throw Error('Invalid map sitemap');
+    for (const [, loc] of xml.matchAll(/<loc>([^<]+)<\/loc>/g)) {
+      const url = new URL(loc.replaceAll('&amp;', '&'));
+      if (url.origin !== 'https://maps.furry.by' || url.search || url.hash || url.username || url.password || !/^\/(?:$|city\/(?:[a-zA-Z0-9_%.-]+\/?)?|profiles\/[a-zA-Z0-9_.-]+\/?)$/.test(url.pathname)) throw Error('Invalid map page');
+    }
+    await mkdir(path.dirname(path.join(out, pathname)), { recursive: true });
+    await writeFile(path.join(out, pathname), xml, 'utf8');
+    continue;
+  }
   if (!/^\/sitemaps\/(?:pages|posts-\d+)\.xml$/.test(pathname))
     throw Error('Unexpected child sitemap');
   let xml = (await get(pathname)).replace(/<loc>([^<]+)<\/loc>/g, (_match, value) => {
@@ -318,7 +329,7 @@ await writeFile(
 );
 await writeFile(
   path.join(out, 'robots.txt'),
-  'User-agent: *\nAllow: /\nSitemap: https://stenka.furry.by/sitemap.xml\nSitemap: http://stenka.furry.by/sitemap-http.xml\n',
+  'User-agent: *\nAllow: /\nSitemap: https://stenka.furry.by/sitemap.xml\nSitemap: http://stenka.furry.by/sitemap-http.xml\nSitemap: https://maps.furry.by/sitemap.xml\n',
   'utf8',
 );
 console.log(

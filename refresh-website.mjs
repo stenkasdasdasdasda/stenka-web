@@ -181,7 +181,7 @@ for (const page of catalog.pages) {
 await mkdir(out, { recursive: true });
 for (const name of await readdir(root))
   if (
-    /^(?:launch-[a-f0-9]{16}\.js|favicon(?:-dfl|-pxl)\.svg|favicon(?:-pxl)?\.(?:svg|png|ico)|apple-touch-icon(?:-pxl)?\.png|CNAME|\.nojekyll)$/.test(
+    /^(?:launch-[a-f0-9]{16}\.js|favicon(?:-dfl|-pxl)\.svg|favicon(?:-pxl)?\.(?:svg|png|ico)|apple-touch-icon(?:-pxl)?\.png|google[0-9a-f]{16}\.html|CNAME|\.nojekyll)$/.test(
       name,
     )
   )

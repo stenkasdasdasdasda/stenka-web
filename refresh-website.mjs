@@ -42,7 +42,7 @@ const mediaUrl = /^https:\/\/cf-stenka\.furry\.by\/media\/[a-zA-Z0-9-]{1,80}\/(?
 const duration = (milliseconds) => 'PT' + milliseconds / 1000 + 'S';
 // Hidden video posters otherwise download before the normal app iframe is ready.
 const activateMedia =
-  "document.addEventListener('DOMContentLoaded',()=>{if(document.documentElement.getAttribute('data-entry')==='public'){const media=document.getElementById('public-media');if(media)media.replaceWith(media.content.cloneNode(true))}},{once:true});";
+  "document.addEventListener('DOMContentLoaded',()=>{if(document.documentElement.getAttribute('data-entry')==='public'){document.querySelectorAll('template[data-public-media]').forEach(media=>media.replaceWith(media.content.cloneNode(true))) }},{once:true});";
 const jsonForHtml = (value) =>
   JSON.stringify(value)
     .replaceAll('<', '\\u003c')
@@ -131,6 +131,36 @@ const catalog = JSON.parse(await get('/site-metadata?batch=1'));
 if (!Array.isArray(catalog.pages) || catalog.pages.length > 500)
   throw Error('Invalid public metadata catalog');
 const metadataByPath = new Map();
+const paragraphs = (text) => text.split(/\n\s*\n/).filter(Boolean).map((paragraph) => '<p>' + escape(paragraph) + '</p>').join('');
+const deferredMedia = (markup, id = '') => markup
+  ? `<template${id ? ` id="${id}"` : ''} data-public-media>${markup}</template><noscript>${markup}</noscript>`
+  : '';
+function renderSections(sections = []) {
+  if (!Array.isArray(sections) || sections.length > 20 || JSON.stringify(sections).length > 16384)
+    throw Error('Invalid public sections');
+  return sections.map((section) => {
+    if (typeof section.heading !== 'string' || section.heading.length > 200 ||
+        !Array.isArray(section.paragraphs) || section.paragraphs.length > 20 ||
+        section.paragraphs.some((text) => typeof text !== 'string' || text.length > 4096))
+      throw Error('Invalid public section');
+    return '<section><h2>' + escape(section.heading) + '</h2>' + section.paragraphs.map(paragraphs).join('') + '</section>';
+  }).join('');
+}
+function renderLinks(links = []) {
+  return links.map((link, index) => {
+    if (!/^\/wall\d{1,16}$/.test(link.path) ||
+        typeof link.title !== 'string' || link.title.length > 4096 ||
+        typeof link.description !== 'string' || link.description.length > 4096 ||
+        (link.text !== undefined && (typeof link.text !== 'string' || link.text.length > 4096)) ||
+        (link.author !== undefined && (typeof link.author.name !== 'string' || link.author.name.length > 200 ||
+          !/^\/u\/[a-zA-Z0-9_]{3,30}$/.test(link.author.path))) ||
+        (link.media !== undefined && (!Array.isArray(link.media) || link.media.length > 1 || index >= 12)))
+      throw Error('Invalid public link');
+    const thumbnail = validateMedia({ media: link.media || [] })[0];
+    const image = thumbnail ? deferredMedia(`<a href="${escape(link.path + '/')}"><img src="${escape(thumbnail.thumbnail)}" alt="${escape(thumbnail.alt || link.title)}" width="${thumbnail.width}" height="${thumbnail.height}" loading="lazy" decoding="async"></a>`) : '';
+    return `<article><h2><a href="${escape(link.path + '/')}">${escape(link.title)}</a></h2>${link.author ? `<a rel="author" href="${escape(link.author.path + '/')}">${escape(link.author.name)}</a>` : ''}${paragraphs(link.text || link.description)}${image}</article>`;
+  }).join('');
+}
 for (const page of catalog.pages) {
   if (
     !/^\/(?:$|about$|rules$|privacy$|wall\d{1,16}$|(?:u|photo)\/[a-zA-Z0-9_]{3,30}$)/.test(
@@ -153,29 +183,16 @@ for (const page of catalog.pages) {
   )
     throw Error('Invalid public metadata');
   const media = renderMedia(page, validateMedia(page));
+  const sections = renderSections(page.sections);
+  const links = renderLinks(page.links);
   const image = media.video?.thumbnail || page.image || page.media?.[0]?.url;
   // Generate only the whitelist. Never retain raw source HTML or arbitrary attributes.
   metadataByPath.set(page.path, {
     title: '<title>' + escape(page.title) + '</title>',
     tags: `${page.noindex ? '<meta name="robots" content="noindex,follow">' : ''}<meta name="description" content="${escape(page.description)}"><meta name="robots" content="max-image-preview:large,max-video-preview:-1"><meta property="og:type" content="${media.video ? 'video.other' : page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(publicUrl(page.path))}">${image ? `<meta property="og:image" content="${escape(image)}">` : ''}<meta name="twitter:card" content="summary_large_image">${media.tags}${media.json ? `<script type="application/ld+json">${media.json}</script>` : ''}`,
     media,
-    content: `<section id="public-content" aria-label="Содержание страницы"><h1>${escape(page.title)}</h1>${media.markup ? `<template id="public-media">${media.markup}</template><noscript>${media.markup}</noscript>` : ''}<p>${escape(page.text || page.description)}</p>${(
-      page.links || []
-    )
-      .map((link) => {
-        if (
-          !/^\/wall\d{1,16}$/.test(link.path) ||
-          typeof link.title !== 'string' ||
-          link.title.length > 4096 ||
-          typeof link.description !== 'string' ||
-          link.description.length > 4096
-        )
-          throw Error('Invalid public link');
-        return `<article><h2><a href="${escape(link.path + '/')}">${escape(link.title)}</a></h2><p>${escape(link.description)}</p></article>`;
-      })
-      .join(
-        '',
-      )}<!--noindex--><div data-nosnippet><nav aria-label="О сайте"><a href="/">Главная</a> · <a href="/about/">О проекте</a> · <a href="/rules/">Правила</a> · <a href="/privacy/">Приватность</a></nav></div><!--/noindex--></section>`,
+    hasDeferredMedia: Boolean(media.markup || links.includes('data-public-media')),
+    content: `<section id="public-content" aria-label="Содержание страницы"><h1>${escape(page.title)}</h1>${paragraphs(page.text || page.description)}${deferredMedia(media.markup, 'public-media')}${sections}${links ? '<section aria-label="Публикации"><h2>Публикации</h2>' + links + '</section>' : ''}<!--noindex--><div data-nosnippet><nav aria-label="О сайте"><a href="/">Главная</a> · <a href="/about/">О проекте</a> · <a href="/rules/">Правила</a> · <a href="/privacy/">Приватность</a></nav></div><!--/noindex--></section>`,
   });
 }
 await mkdir(out, { recursive: true });
@@ -273,10 +290,13 @@ for (const pathname of pages) {
     .replace('</head>', () => metadata.tags + '</head>');
   if (metadata.media.json) {
     const hash = createHash('sha256').update(metadata.media.json).digest('base64');
+    page = page.replace("script-src 'self'", "script-src 'self' 'sha256-" + hash + "'");
+  }
+  if (metadata.hasDeferredMedia) {
     const activationHash = createHash('sha256').update(activateMedia).digest('base64');
     page = page.replace(
       "script-src 'self'",
-      "script-src 'self' 'sha256-" + hash + "' 'sha256-" + activationHash + "'",
+      "script-src 'self' 'sha256-" + activationHash + "'",
     );
     page = page.replace('</head>', '<script>' + activateMedia + '</script></head>');
   }

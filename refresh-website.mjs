@@ -41,8 +41,8 @@ const publicUrl = (pathname) =>
   'https://stenka.furry.by' + (pathname === '/' ? '/' : pagePath(pathname) + '/');
 const canonicalUrl = (pathname) => {
   const page = pagePath(pathname);
-  return /^\/(?:$|about$|support$|rules$|privacy$|wall\d{1,16}$|(?:u|photo)\/[a-zA-Z0-9_]{3,30}$)/.test(page)
-    ? 'https://furry.by' + (page === '/' ? '/wall' : page)
+  return /^\/(?:about$|support$|rules$|privacy$|wall\d{1,16}$|(?:u|photo)\/[a-zA-Z0-9_]{3,30}$)/.test(page)
+    ? 'https://furry.by' + page
     : publicUrl(pathname);
 };
 const mediaUrl = /^https:\/\/cf-stenka\.furry\.by\/media\/[a-zA-Z0-9-]{1,80}\/(?:main|thumb)$/;

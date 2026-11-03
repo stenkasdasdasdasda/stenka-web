@@ -10,6 +10,7 @@ if (!['https://cf-stenka.furry.by', 'https://dns.furry.by'].includes(source))
 const template = await readFile(path.join(root, 'site-template.html'), 'utf8');
 const get = async (pathname) => {
   const response = await fetch(source + pathname, {
+    headers: { Accept: 'application/xml' },
     credentials: 'omit',
     redirect: 'error',
     signal: AbortSignal.timeout(25000),
@@ -38,6 +39,12 @@ const escape = (value) =>
 const pagePath = (pathname) => pathname.replace(/\/+$/, '') || '/';
 const publicUrl = (pathname) =>
   'https://stenka.furry.by' + (pathname === '/' ? '/' : pagePath(pathname) + '/');
+const canonicalUrl = (pathname) => {
+  const page = pagePath(pathname);
+  return /^\/(?:$|about$|support$|rules$|privacy$|wall\d{1,16}$|(?:u|photo)\/[a-zA-Z0-9_]{3,30}$)/.test(page)
+    ? 'https://furry.by' + (page === '/' ? '/wall' : page)
+    : publicUrl(pathname);
+};
 const mediaUrl = /^https:\/\/cf-stenka\.furry\.by\/media\/[a-zA-Z0-9-]{1,80}\/(?:main|thumb)$/;
 const duration = (milliseconds) => 'PT' + milliseconds / 1000 + 'S';
 // Hidden video posters otherwise download before the normal app iframe is ready.
@@ -79,7 +86,7 @@ function validateMedia(page) {
   return media;
 }
 function renderMedia(page, media) {
-  const canonical = publicUrl(page.path);
+  const canonical = canonicalUrl(page.path);
   const markup = [
     ...media.filter((item) => item.kind === 'video'),
     ...media.filter((item) => item.kind === 'image'),
@@ -163,7 +170,7 @@ function renderLinks(links = []) {
 }
 for (const page of catalog.pages) {
   if (
-    !/^\/(?:$|about$|rules$|privacy$|wall\d{1,16}$|(?:u|photo)\/[a-zA-Z0-9_]{3,30}$)/.test(
+    !/^\/(?:$|about$|support$|rules$|privacy$|wall\d{1,16}$|(?:u|photo)\/[a-zA-Z0-9_]{3,30}$)/.test(
       page.path,
     ) ||
     !['https://stenka.furry.by' + page.path, publicUrl(page.path)].includes(page.canonical) ||
@@ -189,7 +196,7 @@ for (const page of catalog.pages) {
   // Generate only the whitelist. Never retain raw source HTML or arbitrary attributes.
   metadataByPath.set(page.path, {
     title: '<title>' + escape(page.title) + '</title>',
-    tags: `${page.noindex ? '<meta name="robots" content="noindex,follow">' : ''}<meta name="description" content="${escape(page.description)}"><meta name="robots" content="max-image-preview:large,max-video-preview:-1"><meta property="og:type" content="${media.video ? 'video.other' : page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(publicUrl(page.path))}">${image ? `<meta property="og:image" content="${escape(image)}">` : ''}<meta name="twitter:card" content="summary_large_image">${media.tags}${media.json ? `<script type="application/ld+json">${media.json}</script>` : ''}`,
+    tags: `${page.noindex ? '<meta name="robots" content="noindex,follow">' : ''}<meta name="description" content="${escape(page.description)}"><meta name="robots" content="max-image-preview:large,max-video-preview:-1"><meta property="og:type" content="${media.video ? 'video.other' : page.type}"><meta property="og:title" content="${escape(page.title)}"><meta property="og:description" content="${escape(page.description)}"><meta property="og:url" content="${escape(canonicalUrl(page.path))}">${image ? `<meta property="og:image" content="${escape(image)}">` : ''}<meta name="twitter:card" content="summary_large_image">${media.tags}${media.json ? `<script type="application/ld+json">${media.json}</script>` : ''}`,
     media,
     hasDeferredMedia: Boolean(media.markup || links.includes('data-public-media')),
     content: `<section id="public-content" aria-label="Содержание страницы"><h1>${escape(page.title)}</h1>${paragraphs(page.text || page.description)}${deferredMedia(media.markup, 'public-media')}${sections}${links ? '<section aria-label="Публикации"><h2>Публикации</h2>' + links + '</section>' : ''}<!--noindex--><div data-nosnippet><nav aria-label="О сайте"><a href="/">Главная</a> · <a href="/about/">О проекте</a> · <a href="/rules/">Правила</a> · <a href="/privacy/">Приватность</a></nav></div><!--/noindex--></section>`,
@@ -230,7 +237,7 @@ try {
 } catch (error) { if (error.code !== 'ENOENT' || (await readdir(root)).includes('android')) throw error; }
 const index = await get('/sitemap.xml');
 await writeFile(path.join(out, 'sitemap.xml'), index, 'utf8');
-const pages = new Set(['/', '/about', '/rules', '/privacy']);
+const pages = new Set(['/', '/about', '/support', '/rules', '/privacy']);
 for (const entry of catalog.pages) if (entry.path.startsWith('/photo/')) pages.add(entry.path);
 for (const pathname of locations(index)) {
   if (/^\/sitemaps\/maps-(?:pages|profiles-[1-9][0-9]*)\.xml$/.test(pathname)) {
@@ -246,9 +253,10 @@ for (const pathname of locations(index)) {
   }
   if (!/^\/sitemaps\/(?:pages|posts-\d+)\.xml$/.test(pathname))
     throw Error('Unexpected child sitemap');
-  let xml = (await get(pathname)).replace(/<loc>([^<]+)<\/loc>/g, (_match, value) => {
+  const sourceXml = await get(pathname);
+  let xml = sourceXml.replace(/<loc>([^<]+)<\/loc>/g, (_match, value) => {
     const [location] = locations('<loc>' + value + '</loc>');
-    return '<loc>' + publicUrl(location) + '</loc>';
+    return '<loc>' + canonicalUrl(location) + '</loc>';
   });
   xml = xml.replace(/<url>([\s\S]*?)<\/url>/g, (entry, body) => {
     const location = body.match(/<loc>([^<]+)<\/loc>/)?.[1];
@@ -265,12 +273,12 @@ for (const pathname of locations(index)) {
     );
   await mkdir(path.dirname(path.join(out, pathname)), { recursive: true });
   await writeFile(path.join(out, pathname), xml, 'utf8');
-  for (const location of locations(xml)) pages.add(pagePath(location));
+  for (const location of locations(sourceXml)) pages.add(pagePath(location));
 }
 if (pages.size > 500) throw Error('Public metadata refresh exceeds the free-tier request ceiling');
 for (const pathname of pages) {
   if (
-    !/^\/(?:$|about$|rules$|privacy$|search$|wall\d+$|(?:u|photo)\/[a-zA-Z0-9_.-]+$|p\/[a-zA-Z0-9-]+(?:\/[a-zA-Z0-9_.-]+)?$|t\/[a-zA-Z0-9_.-]+$)/.test(
+    !/^\/(?:$|about$|support$|rules$|privacy$|search$|wall\d+$|(?:u|photo)\/[a-zA-Z0-9_.-]+$|p\/[a-zA-Z0-9-]+(?:\/[a-zA-Z0-9_.-]+)?$|t\/[a-zA-Z0-9_.-]+$)/.test(
       pathname,
     )
   )
@@ -281,7 +289,7 @@ for (const pathname of pages) {
   await mkdir(directory, { recursive: true });
   let page = template.replace(
     'href="https://stenka.furry.by/"',
-    'href="' + publicUrl(pathname) + '"',
+    'href="' + canonicalUrl(pathname) + '"',
   );
   // Escape approved plain text; never export source documents, CSRF or private content.
   if (metadata.title) page = page.replace(/<title>[^<]*<\/title>/, () => metadata.title);
@@ -349,7 +357,7 @@ await writeFile(
 );
 await writeFile(
   path.join(out, 'robots.txt'),
-  'User-agent: *\nAllow: /\nSitemap: https://stenka.furry.by/sitemap.xml\nSitemap: http://stenka.furry.by/sitemap-http.xml\nSitemap: https://maps.furry.by/sitemap.xml\n',
+  'User-agent: *\nAllow: /\nSitemap: https://furry.by/sitemap.xml\nSitemap: https://maps.furry.by/sitemap.xml\n',
   'utf8',
 );
 console.log(

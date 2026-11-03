@@ -357,7 +357,7 @@ await writeFile(
 );
 await writeFile(
   path.join(out, 'robots.txt'),
-  'User-agent: *\nAllow: /\nSitemap: https://furry.by/sitemap.xml\n',
+  'User-agent: *\nAllow: /\nSitemap: https://furry.by/sitemap.xml\nSitemap: https://maps.furry.by/sitemap.xml\n',
   'utf8',
 );
 console.log(
